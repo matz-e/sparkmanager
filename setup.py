@@ -3,6 +3,7 @@
 
 from setuptools import setup
 
+SPARKMANAGER_NAME = 'sparkmanager'
 SPARKMANAGER_VERSION = '0.0.1'
 
 
@@ -12,6 +13,7 @@ def setup_package():
     setup.cfg has more metadata.
     """
     setup(
+        name=SPARKMANAGER_NAME,
         version=SPARKMANAGER_VERSION,
         packages=[
             'sparkmanager',

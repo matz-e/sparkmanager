@@ -2,7 +2,27 @@ Spark Management Consolidated
 =============================
 
 A small module that will load as a singleton class object to manage Spark
-related things:
+related things.
+
+Installation
+------------
+
+Directly via ``pip`` on the command line, in a `virtualenv`:
+
+.. code:: shell
+
+   pip install https://github.com/matz-e/sparkmanager/tarball/master
+
+or for the current user:
+
+.. code:: shell
+
+   pip install --user https://github.com/matz-e/sparkmanager/tarball/master
+
+Usage
+-----
+
+The module itself acts as a mediator to Spark:
 
 .. code:: python
 
@@ -12,6 +32,7 @@ related things:
    sm.create("My fancy name")
 
    data = sm.spark.range(5)
+   # Will show up in the UI with the name "broadcasting some data"
    with sm.jobgroup("broadcasting some data"):
        data = sm.broadcast(data.collect())
 
@@ -22,6 +43,7 @@ the :py:class:`SparkManager` object:
 
 .. code:: python
 
+   # The following two calls are equivalent
    c = sm.parallelize(range(5))
    d = sm.sc.parallelize(range(5))
    assert c.collect() == d.collect()
