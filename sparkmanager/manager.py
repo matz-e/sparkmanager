@@ -43,7 +43,10 @@ class SparkManager(object):
             raise AttributeError("Cannot resolve attribute unambiguously!")
         if attr not in self.__allowed:
             raise AttributeError("Cannot resolve attribute!")
-        return getattr(self.__session, attr, getattr(self.__context, attr))
+        try:
+            return getattr(self.__session, attr)
+        except AttributeError:
+            return getattr(self.__context, attr)
 
     def create(self, name=None, config=None, options=None):
         """Create a new Spark session if needed
