@@ -38,8 +38,16 @@ def setup_package():
             'pyspark',
             'six'
         ],
-        tests_require=['pytest', 'pytest-cov'],
-        cmdclass={'test': PyTest}
+        tests_require=[
+            'pytest',
+            'pytest-cov'
+        ],
+        cmdclass={
+            'test': PyTest
+        },
+        scripts=[
+            'scripts/sm_cluster'
+        ]
     )
 
 
