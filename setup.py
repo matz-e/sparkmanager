@@ -7,7 +7,7 @@ from setuptools.command.test import test as TestCommand
 import sys
 
 SPARKMANAGER_NAME = 'sparkmanager'
-SPARKMANAGER_VERSION = '0.0.1'
+SPARKMANAGER_VERSION = '0.0.2'
 
 
 class PyTest(TestCommand):
