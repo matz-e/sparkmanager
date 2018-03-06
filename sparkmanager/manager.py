@@ -20,6 +20,8 @@ class SparkManager(object):
 
         self.__gstack = [(None, None)]
 
+        self.__cleaning = False
+
     @property
     def spark(self):
         """:property: the Spark session
@@ -97,14 +99,57 @@ class SparkManager(object):
 
         The job group will be named after the function, with the docstring as
         description.
+
+        :param f: function to decorate
         """
         n = f.func_name
-        d = f.__doc__.strip()
+        d = f.__doc__.strip() if f.__doc__ else ''
 
         def new_f(*args, **kwargs):
             with self.jobgroup(n, d):
                 return f(*args, **kwargs)
         return update_wrapper(new_f, f)
+
+    @contextmanager
+    def benchmark(self):
+        """Create a setup for benchmarking
+
+        Performs a little warmup procedure.
+
+        .. warning::
+
+           Will clear the cache when running!
+        """
+        try:
+            self.reset_cache()
+            # Warm-up
+            df = self.spark.range(1000)
+            df.count()
+            yield
+        finally:
+            pass
+
+    @contextmanager
+    def clean_cache(self):
+        """Clean the rdd cache
+
+        .. warning::
+
+           May not preserve Dataframes correctly!
+        """
+        if self.__cleaning:
+            msg = "Nested cleaning of temporary RDDs is not supported!"
+            raise NotImplementedError(msg)
+        self.__cleaning = True
+        pre = set(rdd.id() for _, rdd in iteritems(self.sc._jsc.getPersistentRDDs()))
+        try:
+            yield
+        finally:
+            post = set(rdd.id() for _, rdd in iteritems(self.sc._jsc.getPersistentRDDs()))
+            by_id = {r.id(): r for r in self.sc._jsc.getPersistentRDDs().values()}
+            for rdd in post - pre:
+                by_id[rdd].unpersist()
+            self.__cleaning = False
 
     @contextmanager
     def jobgroup(self, name, desc=""):
@@ -120,3 +165,10 @@ class SparkManager(object):
         finally:
             self.__gstack.pop()
             self.__context.setJobGroup(*self.__gstack[-1])
+
+    def reset_cache(self):
+        """Clear all caches
+        """
+        for _, rdd in iteritems(self.sc._jsc.getPersistentRDDs()):
+            rdd.unpersist()
+        self.catalog.clearCache()
