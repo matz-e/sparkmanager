@@ -41,8 +41,123 @@ _detect_allocation() {
     fi
 }
 
+_cobalt_start_master() {
+    envscript=$1
+    workdir=$2
+    [[ -z "$workdir" || -z "$envscript" ]] && usage
+
+    export SM_WORKDIR="$workdir"
+
+    . $envscript
+
+    export SM_MASTER_MEMORY=${SM_MASTER_MEMORY:-4096}
+    export SPARK_DAEMON_MEMORY=${SM_MASTER_MEMORY}m
+    export SPARK_MASTER_IP=$(hostname)
+
+    echo "spark://$SPARK_MASTER_IP:${SPARK_MASTER_PORT:-7077}" > "$workdir/spark_master"
+
+    $SPARK_ROOT/sbin/start-master.sh
+}
+
+_cobalt_start_worker() {
+    envscript=$1
+    workdir=$2
+    [[ -z "$workdir" || -z "$envscript" ]] && usage
+
+    export SM_WORKDIR="$workdir"
+
+    . $envscript
+
+    MASTER_NODE=$(cat $workdir/spark_master)
+
+    echo "> Connecting to ${MASTER_NODE}"
+
+    $SPARK_ROOT/sbin/start-slave.sh $MASTER_NODE || exit $?
+}
+
 _cobalt_start_cluster() {
-    cat "$COBALT_NODEFILE"
+    envscript=$1
+    workdir=$2
+    [[ -z "$workdir" || -z "$envscript" ]] && usage
+
+    script=$(readlink -f $0)
+    workdir=$(readlink -f $workdir)
+    envscript=$(readlink -f $envscript)
+
+    master=$(grep -oe '\(\w*\.\)\{1,\}\w*'<$workdir/spark_master)
+
+    if [ -z "$(ssh $master jps -lm 2>/dev/null|grep org.apache.spark.deploy.master.Master)" ]; then
+        master=
+    fi
+
+    if [ ! -d "$workdir" ]; then
+        echo ">> Creating working directory '$workdir'"
+        mkdir $workdir
+    fi
+
+    if [ -z "$master" ]; then
+        echo ">> Copying myself to working directory '$workdir'"
+        cp $script $workdir
+
+        master=$(head -n 1 "$COBALT_NODEFILE")
+        ssh $master "$workdir/$(basename $script)" _cobalt_start_master "$envscript" "$workdir"
+    else
+        echo "<< Connecting to master $master"
+    fi
+
+    while read host; do
+        ssh $host "$workdir/$(basename $script)" _cobalt_start_master "$envscript" "$workdir"
+    done < "$COBALT_NODEFILE"
+}
+
+_cobalt_stop_master() {
+    envscript=$1
+    workdir=$2
+    [[ -z "$workdir" || -z "$envscript" ]] && usage
+
+    export SM_WORKDIR="$workdir"
+
+    . $envscript
+
+    result=$($SPARK_ROOT/sbin/stop-master.sh)
+    echo $result
+    if [[ $result == *"to stop"* ]]; then
+        proc=$(ps -A | grep java)
+        [[ ! -z "$proc" ]] && pkill -9 java
+    fi
+}
+
+_cobalt_stop_worker() {
+    envscript=$1
+    workdir=$2
+    [[ -z "$workdir" || -z "$envscript" ]] && usage
+
+    export SM_WORKDIR="$workdir"
+
+    . $envscript
+
+    result=$($SPARK_ROOT/sbin/stop-slave.sh)
+    echo $result
+    if [[ $result == *"to stop"* ]]; then
+        proc=$(ps -A | grep java)
+        [[ ! -z "$proc" ]] && pkill -9 java
+    fi
+}
+
+_cobalt_stop_cluster() {
+    envscript=$1
+    workdir=$2
+    [[ -z "$workdir" || -z "$envscript" ]] && usage
+
+    script=$(readlink -f $0)
+    workdir=$(readlink -f $workdir)
+    envscript=$(readlink -f $envscript)
+
+    master=$(head -n 1 "$COBALT_NODEFILE")
+    ssh $master "$script" _cobalt_stop_master "$envscript" "$workdir"
+    while read host; do
+        ssh $host "$script" _cobalt_stop_worker "$envscript" "$workdir"
+    done < "$COBALT_NODEFILE"
 }
 
 _slurm_sleep() {
@@ -86,6 +201,10 @@ _slurm_start_cluster() {
     fi
 
     srun $workdir/$(basename $script) _slurm_start_processes $envscript $workdir $master
+}
+
+_slurm_stop_cluster() {
+    echo "!!! Just kill the allocation"
 }
 
 _slurm_start_processes() {
@@ -149,11 +268,30 @@ startup() {
 }
 
 shutdown() {
-    cmd=_${batch}_stop_cluster
-    if [ -z "$(type $cmd 2> /dev/null|grep function)" ]; then
-        echo "STOPPING"
+    workdir=$1
+    envscript=$2
+    batch=$(_detect_allocation)
+
+    if [ -z "$batch" ]; then
+        echo "!!! Cannot detect batch system"
+        usage
     fi
-    echo stop
+
+    if [ -z "$envscript" ]; then
+        envscript="$workdir/env.sh"
+        if [[ ! -a "$envscript" ]]; then
+            echo "!!! Missing environment script $envscript"
+            usage
+        fi
+    fi
+
+
+    if [ -z "$workdir" ]; then
+        usage
+    fi
+
+    echo ">>> Running on ${batch}"
+    _${batch}_stop_cluster $envscript $workdir
 }
 
 cmd=$1

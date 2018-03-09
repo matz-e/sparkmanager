@@ -97,7 +97,8 @@ Similar, to stop a cluster (not necessary with slurm):
 
 .. code:: shell
 
-   sm_cluster shutdown
+   sm_cluster shutdown $WORKDIR
+   sm_cluster shutdown $WORKDIR /path/to/some/env.sh
 
 Spark applications then can connect to a master found via:
 
