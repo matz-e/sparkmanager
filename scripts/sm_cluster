@@ -45,6 +45,19 @@ _cobalt_start_cluster() {
     cat "$COBALT_NODEFILE"
 }
 
+_slurm_sleep() {
+    time=$(
+        scontrol show job $SLURM_JOBID| \
+            ruby -rdate -ne "
+                if (m = \$_.match(%r{EndTime=(.*)Deadline}))
+                    diff = DateTime.now() - DateTime.parse(m[1] + ' ' + DateTime.now.zone)
+                    puts (diff * (24*60*60)).to_i
+                end"
+    )
+    echo "> Sleeping $time seconds"
+    sleep $time
+}
+
 _slurm_start_cluster() {
     envscript=$1
     workdir=$2
@@ -105,7 +118,7 @@ _slurm_start_processes() {
     echo "> Connecting to ${MASTER_NODE}"
 
     $SPARK_ROOT/sbin/start-slave.sh $MASTER_NODE || exit $?
-    sleep 1d
+    _slurm_sleep
 }
 
 startup() {
