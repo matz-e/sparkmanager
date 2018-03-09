@@ -47,3 +47,60 @@ the :py:class:`SparkManager` object:
    c = sm.parallelize(range(5))
    d = sm.sc.parallelize(range(5))
    assert c.collect() == d.collect()
+
+Cluster support scripts
+-----------------------
+
+.. note::
+
+   Scripts to run on the cluster are still somewhat experimental and should
+   be used with caution!
+
+Environment setup
+~~~~~~~~~~~~~~~~~
+
+To create a self-contained Spark environment, the script provided in
+``examples/env.sh`` can be used. It is currently tuned to the requirements of
+the `bbpviz` cluster.  A usage example:
+
+.. code:: shell
+
+   SPARK_ROOT=/path/to/my/spark/installation SM_WORKDIR=/path/to/a/work/directory examples/env.sh
+
+The working directory will contain:
+
+* A Python virtual environment
+* A basic Spark configuration pointing to directories within the working
+  directory
+* An environment script to establish the setup
+
+To use the resulting working environment:
+
+.. code:: shell
+
+   . /path/to/a/work/directory/env.sh
+
+Spark deployment on allocations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Within a cluster allocation, the script ``sm_cluster`` can be used to start
+a Spark cluster.  The script will be automatically installed by `pip`.  To
+use it, pass either a working directory containing an environment or
+specify them separately:
+
+.. code:: shell
+
+   sm_cluster startup $WORKDIR
+   sm_cluster startup $WORKDIR /path/to/some/env.sh
+
+Similar, to stop a cluster (not necessary with slurm):
+
+.. code:: shell
+
+   sm_cluster shutdown
+
+Spark applications then can connect to a master found via:
+
+.. code:: shell
+
+   cat $WORKDIR/spark_master
