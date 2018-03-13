@@ -21,11 +21,12 @@ export SPARK_ROOT=${SPARK_ROOT:-$HOME/work/spark-2.3.0-bin-hadoop2.7}
 create_work_environment() {
     workdir=$1
 
-    mkdir -p $workdir/{conf,eventlog,log,tmp,worker}
+    mkdir -p $workdir/{conf,derby,eventlog,log,tmp,worker}
 
     virtualenv $workdir/virtualenv
 
     cat > $workdir/conf/spark-defaults.conf <<EOF
+derby.system.home=$workdir/derby
 spark.local.dir=$workdir/tmp
 spark.eventLog.enabled=true
 spark.eventLog.dir=$workdir/eventlog
