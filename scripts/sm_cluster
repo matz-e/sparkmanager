@@ -165,7 +165,7 @@ _slurm_sleep() {
         scontrol show job $SLURM_JOBID| \
             ruby -rdate -ne "
                 if (m = \$_.match(%r{EndTime=(.*)Deadline}))
-                    diff = DateTime.now() - DateTime.parse(m[1] + ' ' + DateTime.now.zone)
+                    diff = DateTime.parse(m[1] + ' ' + DateTime.now.zone) - DateTime.now()
                     puts (diff * (24*60*60)).to_i
                 end"
     )
