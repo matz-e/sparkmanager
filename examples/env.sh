@@ -27,9 +27,14 @@ create_work_environment() {
 
     cat > $workdir/conf/spark-defaults.conf <<EOF
 spark.driver.extraJavaOptions=-Dderby.system.home=$workdir/derby
+
+spark.executor.cores=5
+spark.executor.memory=25g
+
 spark.eventLog.enabled=true
 spark.eventLog.dir=$workdir/eventlog
 spark.history.fs.logDirectory=$workdir/eventlog
+
 spark.local.dir=/nvme,$workdir/tmp
 spark.sql.warehouse.dir=$workdir/warehouse
 EOF
