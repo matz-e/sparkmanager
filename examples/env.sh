@@ -29,8 +29,8 @@ create_work_environment() {
 spark.driver.extraJavaOptions=-Dderby.system.home=$workdir/derby
 
 # see https://stackoverflow.com/questions/37871194/how-to-tune-spark-executor-number-cores-and-executor-memory
-spark.executor.cores=5
-spark.executor.memory=25g
+spark.executor.cores=8
+spark.executor.memory=40g
 
 spark.eventLog.enabled=true
 spark.eventLog.dir=$workdir/eventlog
