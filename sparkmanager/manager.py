@@ -5,7 +5,38 @@ from functools import update_wrapper
 from pyspark.sql import SparkSession
 from six import iteritems
 
+import json
 import os
+import time
+
+
+class SparkReport(object):
+    """Save time differences to a file
+    """
+    def __init__(self, filename, manager):
+        """Create a new instance
+
+        :param filename: filename to store data in
+        :param manager: spark manager to query for additional data
+        """
+        self.__filename = filename
+        if not os.path.exists(os.path.dirname(filename)):
+            os.makedirs(os.path.dirname(filename))
+        self.__performance = {
+            'parallelism': manager.defaultParallelism,
+            'timing': {},
+            'version': manager.spark.version
+        }
+
+    def __call__(self, name, delta):
+        """Update stored information
+
+        :param name: key to use
+        :param delta: timedifference to store
+        """
+        self.__performance['timing'][name] = delta
+        with open(self.__filename, 'w') as fd:
+            json.dump(self.__performance, fd)
 
 
 class SparkManager(object):
@@ -21,6 +52,7 @@ class SparkManager(object):
         self.__gstack = [(None, None)]
 
         self.__cleaning = False
+        self.__performance = None
 
     @property
     def spark(self):
@@ -50,7 +82,7 @@ class SparkManager(object):
         except AttributeError:
             return getattr(self.__context, attr)
 
-    def create(self, name=None, config=None, options=None):
+    def create(self, name=None, config=None, options=None, report=None):
         """Create a new Spark session if needed
 
         Will use the name and configuration options provided to create a new
@@ -60,6 +92,8 @@ class SparkManager(object):
         :param config: configuration parameters to be applied before
                        building the spark session
         :param options: environment options for launching the spark session
+        :param report: filename to save a timing report
+        :type report: str
         """
         if self.__session:
             return self.__session
@@ -90,6 +124,9 @@ class SparkManager(object):
                         if getattr(self.__session, i) is getattr(self.__context, i))
         self.__overlap -= identical
         self.__allowed |= identical
+
+        if report:
+            self.__report = SparkReport(report, self)
 
         return self.__session
 
@@ -161,8 +198,11 @@ class SparkManager(object):
         self.__context.setJobGroup(name, desc)
         self.__gstack.append((name, desc))
         try:
+            start = time.time()
             yield
         finally:
+            if self.__report:
+                self.__report(name, time.time() - start)
             self.__gstack.pop()
             self.__context.setJobGroup(*self.__gstack[-1])
 
