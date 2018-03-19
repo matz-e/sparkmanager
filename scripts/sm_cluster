@@ -229,7 +229,7 @@ _slurm_start_processes() {
     fi
 
     export SPARK_WORKER_CORES=${SLURM_CPUS_PER_TASK:-$SLURM_CPUS_ON_NODE}
-    export SPARK_WORKER_MEMORY=$(($SLURM_CPUS_ON_NODE * $SLURM_MEM_PER_CPU - $SM_MASTER_MEMORY))m
+    export SPARK_WORKER_MEMORY=$((${SLURM_MEM_PER_NODE:-$(($SLURM_CPUS_ON_NODE * $SLURM_MEM_PER_CPU))} - $SM_MASTER_MEMORY))m
 
     MASTER_NODE=${master:-spark://$(scontrol show hostname $SLURM_NODELIST | head -n 1):7077}
 
