@@ -26,11 +26,17 @@ create_work_environment() {
     virtualenv $workdir/virtualenv
 
     cat > $workdir/conf/spark-defaults.conf <<EOF
-spark.driver.extraJavaOptions=-Dderby.system.home=$workdir/derby
-
 # see https://stackoverflow.com/questions/37871194/how-to-tune-spark-executor-number-cores-and-executor-memory
 spark.executor.cores=8
-spark.executor.memory=40g
+spark.executor.memory=31g
+
+# recommended, not the default due to backwards compatibility
+spark.serializer=org.apache.spark.serializer.KryoSerializer
+
+# increase network timeouts, as mentioned in some logs
+spark.network.timeout=6000
+# also increase the heartbeat timeout
+spark.executor.heartbeatInterval=120
 
 spark.eventLog.enabled=true
 spark.eventLog.dir=$workdir/eventlog
