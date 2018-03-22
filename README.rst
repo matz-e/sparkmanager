@@ -105,3 +105,16 @@ Spark applications then can connect to a master found via:
 .. code:: shell
 
    cat $WORKDIR/spark_master
+
+TL;DR on BlueBrain 5
+~~~~~~~~~~~~~~~~~~~~
+
+Setup a Spark environment in your current shell, and point `WORKDIR` to a
+shared directory. `SPARK_HOME` needs to be in your environment and point to
+your Spark installation.  By default, only a file with the Spark master and
+the cluster launch script will be copied to `WORKDIR`. Then submit a
+cluster with:
+
+.. code:: shell
+
+   sbatch -A proj16 -t 24:00:00 -N4 --exclusive -C nvme $(which sm_cluster) startup $WORKDIR

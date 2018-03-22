@@ -42,13 +42,13 @@ _detect_allocation() {
 }
 
 _cobalt_start_master() {
-    envscript=$1
-    workdir=$2
-    [[ -z "$workdir" || -z "$envscript" ]] && usage
+    workdir=$1
+    envscript=$2
+    [[ -z "$workdir" ]] && usage
 
     export SM_WORKDIR="$workdir"
 
-    . $envscript
+    [[ -a "$envscript" ]] && . $envscript
 
     export SM_MASTER_MEMORY=${SM_MASTER_MEMORY:-4096}
     export SPARK_DAEMON_MEMORY=${SM_MASTER_MEMORY}m
@@ -60,13 +60,13 @@ _cobalt_start_master() {
 }
 
 _cobalt_start_worker() {
-    envscript=$1
-    workdir=$2
-    [[ -z "$workdir" || -z "$envscript" ]] && usage
+    workdir=$1
+    envscript=$2
+    [[ -z "$workdir" ]] && usage
 
     export SM_WORKDIR="$workdir"
 
-    . $envscript
+    [[ -f "$envscript" ]] && . $envscript
 
     MASTER_NODE=$(cat $workdir/spark_master)
 
@@ -76,9 +76,9 @@ _cobalt_start_worker() {
 }
 
 _cobalt_start_cluster() {
-    envscript=$1
-    workdir=$2
-    [[ -z "$workdir" || -z "$envscript" ]] && usage
+    workdir=$1
+    envscript=$2
+    [[ -z "$workdir" ]] && usage
 
     script=$(readlink -f $0)
     workdir=$(readlink -f $workdir)
@@ -100,24 +100,24 @@ _cobalt_start_cluster() {
         cp $script $workdir
 
         master=$(head -n 1 "$COBALT_NODEFILE")
-        ssh $master "$workdir/$(basename $script)" _cobalt_start_master "$envscript" "$workdir"
+        ssh $master "$workdir/$(basename $script)" _cobalt_start_master "$workdir" "$envscript"
     else
         echo "<< Connecting to master $master"
     fi
 
     while read host; do
-        ssh $host "$workdir/$(basename $script)" _cobalt_start_master "$envscript" "$workdir"
+        ssh $host "$workdir/$(basename $script)" _cobalt_start_master "$workdir "$envscript""
     done < "$COBALT_NODEFILE"
 }
 
 _cobalt_stop_master() {
-    envscript=$1
-    workdir=$2
-    [[ -z "$workdir" || -z "$envscript" ]] && usage
+    workdir=$1
+    envscript=$2
+    [[ -z "$workdir" ]] && usage
 
     export SM_WORKDIR="$workdir"
 
-    . $envscript
+    [[ -f "$envscript" ]] && . $envscript
 
     result=$($SPARK_HOME/sbin/stop-master.sh)
     echo $result
@@ -130,11 +130,11 @@ _cobalt_stop_master() {
 _cobalt_stop_worker() {
     envscript=$1
     workdir=$2
-    [[ -z "$workdir" || -z "$envscript" ]] && usage
+    [[ -z "$workdir" ]] && usage
 
     export SM_WORKDIR="$workdir"
 
-    . $envscript
+    [[ -f "$envscript" ]] && . $envscript
 
     result=$($SPARK_HOME/sbin/stop-slave.sh)
     echo $result
@@ -145,18 +145,18 @@ _cobalt_stop_worker() {
 }
 
 _cobalt_stop_cluster() {
-    envscript=$1
-    workdir=$2
-    [[ -z "$workdir" || -z "$envscript" ]] && usage
+    workdir=$1
+    envscript=$2
+    [[ -z "$workdir" ]] && usage
 
     script=$(readlink -f $0)
     workdir=$(readlink -f $workdir)
     envscript=$(readlink -f $envscript)
 
     master=$(head -n 1 "$COBALT_NODEFILE")
-    ssh $master "$script" _cobalt_stop_master "$envscript" "$workdir"
+    ssh $master "$script" _cobalt_stop_master "$workdir" "$envscript"
     while read host; do
-        ssh $host "$script" _cobalt_stop_worker "$envscript" "$workdir"
+        ssh $host "$script" _cobalt_stop_worker "$workdir" "$envscript"
     done < "$COBALT_NODEFILE"
 }
 
@@ -174,18 +174,20 @@ _slurm_sleep() {
 }
 
 _slurm_start_cluster() {
-    envscript=$1
-    workdir=$2
-    [[ -z "$workdir" || -z "$envscript" ]] && usage
+    workdir=$1
+    envscript=$2
+    [[ -z "$workdir" ]] && usage
 
     script=$(readlink -f $0)
     workdir=$(readlink -f $workdir)
     envscript=$(readlink -f $envscript)
 
-    master=$(grep -oe '\(\w*\.\)\{1,\}\w*'<$workdir/spark_master)
+    master=
+    [[ -f "$workdir/spark_master" ]] && master=$(grep -oe '\(\w*\.\)\{1,\}\w*'<$workdir/spark_master)
 
     if [ -z "$(ssh $master jps -lm 2>/dev/null|grep org.apache.spark.deploy.master.Master)" ]; then
         master=
+        rm -f "$workdir/spark_master"
     fi
 
     if [ ! -d "$workdir" ]; then
@@ -200,7 +202,7 @@ _slurm_start_cluster() {
         echo "<< Connecting to master $master"
     fi
 
-    srun $workdir/$(basename $script) _slurm_start_processes $envscript $workdir $master
+    srun $workdir/$(basename $script) _slurm_start_processes "$workdir" "$master" "$envscript"
 }
 
 _slurm_stop_cluster() {
@@ -208,14 +210,14 @@ _slurm_stop_cluster() {
 }
 
 _slurm_start_processes() {
-    envscript=$1
-    workdir=$2
-    master=$3
-    [[ -z "$workdir" || -z "$envscript" ]] && usage
+    workdir=$1
+    master=$2
+    envscript=$3
+    [[ -z "$workdir" ]] && usage
 
     export SM_WORKDIR="$workdir"
 
-    . $envscript
+    [[ -f "$envscript" ]] && . $envscript
 
     export SM_MASTER_MEMORY=${SM_MASTER_MEMORY:-4096}
 
@@ -223,10 +225,13 @@ _slurm_start_processes() {
         export SPARK_DAEMON_MEMORY=${SM_MASTER_MEMORY}m
         export SPARK_MASTER_IP=$(hostname)
 
+        output=$($SPARK_HOME/sbin/start-master.sh)
+        echo "$output"
         echo "spark://$SPARK_MASTER_IP:${SPARK_MASTER_PORT:-7077}" > "$workdir/spark_master"
-
-        $SPARK_HOME/sbin/start-master.sh
+        [[ "$output" == *failed* ]] && exit 1
     fi
+
+    while [[ ! -f "$workdir/spark_master" ]]; do sleep 0.5s; done
 
     export SPARK_WORKER_CORES=${SLURM_CPUS_PER_TASK:-$SLURM_CPUS_ON_NODE}
     export SPARK_WORKER_MEMORY=$((${SLURM_MEM_PER_NODE:-$(($SLURM_CPUS_ON_NODE * $SLURM_MEM_PER_CPU))} - $SM_MASTER_MEMORY))m
@@ -236,7 +241,9 @@ _slurm_start_processes() {
     echo "> Running workers with ${SPARK_WORKER_CORES} cores and ${SPARK_WORKER_MEMORY} memory"
     echo "> Connecting to ${MASTER_NODE}"
 
-    $SPARK_HOME/sbin/start-slave.sh $MASTER_NODE || exit $?
+    output=$($SPARK_HOME/sbin/start-slave.sh $MASTER_NODE)
+    echo "$output"
+    [[ "$output" == *failed* ]] && exit 1
     _slurm_sleep
 }
 
@@ -250,21 +257,17 @@ startup() {
         usage
     fi
 
-    if [ -z "$envscript" ]; then
-        envscript="$workdir/env.sh"
-        if [[ ! -a "$envscript" ]]; then
-            echo "!!! Missing environment script $envscript"
-            usage
-        fi
-    fi
-
+    test="$workdir/env.sh"
+    [[ -z "$envscript" && -f "$test" ]] && envscript="$test"
+    test="$workdir/spark-env.sh"
+    [[ -z "$envscript" && -f "$test" ]] && envscript="$test"
 
     if [ -z "$workdir" ]; then
         usage
     fi
 
     echo ">>> Running on ${batch}"
-    _${batch}_start_cluster $envscript $workdir
+    _${batch}_start_cluster "$workdir" "$envscript"
 }
 
 shutdown() {
@@ -277,21 +280,17 @@ shutdown() {
         usage
     fi
 
-    if [ -z "$envscript" ]; then
-        envscript="$workdir/env.sh"
-        if [[ ! -a "$envscript" ]]; then
-            echo "!!! Missing environment script $envscript"
-            usage
-        fi
-    fi
-
+    test="$workdir/env.sh"
+    [[ -z "$envscript" && -f "$test" ]] && envscript="$test"
+    test="$workdir/spark-env.sh"
+    [[ -z "$envscript" && -f "$test" ]] && envscript="$test"
 
     if [ -z "$workdir" ]; then
         usage
     fi
 
     echo ">>> Running on ${batch}"
-    _${batch}_stop_cluster $envscript $workdir
+    _${batch}_stop_cluster "$workdir" "$envscript"
 }
 
 cmd=$1
