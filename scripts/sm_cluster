@@ -56,7 +56,7 @@ _cobalt_start_master() {
 
     echo "spark://$SPARK_MASTER_IP:${SPARK_MASTER_PORT:-7077}" > "$workdir/spark_master"
 
-    $SPARK_ROOT/sbin/start-master.sh
+    $SPARK_HOME/sbin/start-master.sh
 }
 
 _cobalt_start_worker() {
@@ -72,7 +72,7 @@ _cobalt_start_worker() {
 
     echo "> Connecting to ${MASTER_NODE}"
 
-    $SPARK_ROOT/sbin/start-slave.sh $MASTER_NODE || exit $?
+    $SPARK_HOME/sbin/start-slave.sh $MASTER_NODE || exit $?
 }
 
 _cobalt_start_cluster() {
@@ -119,7 +119,7 @@ _cobalt_stop_master() {
 
     . $envscript
 
-    result=$($SPARK_ROOT/sbin/stop-master.sh)
+    result=$($SPARK_HOME/sbin/stop-master.sh)
     echo $result
     if [[ $result == *"to stop"* ]]; then
         proc=$(ps -A | grep java)
@@ -136,7 +136,7 @@ _cobalt_stop_worker() {
 
     . $envscript
 
-    result=$($SPARK_ROOT/sbin/stop-slave.sh)
+    result=$($SPARK_HOME/sbin/stop-slave.sh)
     echo $result
     if [[ $result == *"to stop"* ]]; then
         proc=$(ps -A | grep java)
@@ -225,7 +225,7 @@ _slurm_start_processes() {
 
         echo "spark://$SPARK_MASTER_IP:${SPARK_MASTER_PORT:-7077}" > "$workdir/spark_master"
 
-        $SPARK_ROOT/sbin/start-master.sh
+        $SPARK_HOME/sbin/start-master.sh
     fi
 
     export SPARK_WORKER_CORES=${SLURM_CPUS_PER_TASK:-$SLURM_CPUS_ON_NODE}
@@ -236,7 +236,7 @@ _slurm_start_processes() {
     echo "> Running workers with ${SPARK_WORKER_CORES} cores and ${SPARK_WORKER_MEMORY} memory"
     echo "> Connecting to ${MASTER_NODE}"
 
-    $SPARK_ROOT/sbin/start-slave.sh $MASTER_NODE || exit $?
+    $SPARK_HOME/sbin/start-slave.sh $MASTER_NODE || exit $?
     _slurm_sleep
 }
 

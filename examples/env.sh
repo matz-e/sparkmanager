@@ -12,7 +12,7 @@ EOF
     export SM_CUSTOMIZATION
 fi
 
-export SPARK_ROOT=${SPARK_ROOT:-$HOME/work/spark-2.3.0-bin-hadoop2.7}
+export SPARK_HOME=${SPARK_HOME:-$HOME/work/spark-2.3.0-bin-hadoop2.7}
 
 ##############################
 # Create and use environment #
@@ -61,13 +61,13 @@ EOF
     cat >> $workdir/env.sh <<EOF
 . $workdir/virtualenv/bin/activate
 
-export SPARK_ROOT=$SPARK_ROOT
+export SPARK_HOME=$SPARK_HOME
 
 export SPARK_CONF_DIR=$workdir/conf
 export SPARK_LOG_DIR=$workdir/log
 export SPARK_WORKER_DIR=$workdir/worker
 
-export PATH=\$SPARK_ROOT/bin:\$PATH
+export PATH=\$SPARK_HOME/bin:\$PATH
 EOF
 }
 
