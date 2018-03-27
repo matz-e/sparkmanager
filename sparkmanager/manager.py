@@ -20,13 +20,17 @@ class SparkReport(object):
         :param manager: spark manager to query for additional data
         """
         self.__filename = filename
-        if not os.path.exists(os.path.dirname(filename)):
-            os.makedirs(os.path.dirname(filename))
-        self.__performance = {
+        self.__report = {
             'parallelism': manager.defaultParallelism,
-            'timing': {},
+            'timing': [[]],
             'version': manager.spark.version
         }
+        if not os.path.exists(os.path.dirname(filename)):
+            os.makedirs(os.path.dirname(filename))
+        elif os.path.exists(filename):
+            with open(filename, 'r') as fd:
+                data = json.load(fd)
+                self.__report['timing'] = data['timing'] + [[]]
 
     def __call__(self, name, delta):
         """Update stored information
@@ -34,9 +38,9 @@ class SparkReport(object):
         :param name: key to use
         :param delta: timedifference to store
         """
-        self.__performance['timing'][name] = delta
+        self.__report['timing'][-1].append((name, delta))
         with open(self.__filename, 'w') as fd:
-            json.dump(self.__performance, fd)
+            json.dump(self.__report, fd)
 
 
 class SparkManager(object):
@@ -52,7 +56,7 @@ class SparkManager(object):
         self.__gstack = [(None, None)]
 
         self.__cleaning = False
-        self.__performance = None
+        self.__report = None
 
     @property
     def spark(self):
@@ -76,13 +80,14 @@ class SparkManager(object):
         if attr in self.__overlap:
             raise AttributeError("Cannot resolve attribute unambiguously!")
         if attr not in self.__allowed:
-            raise AttributeError("Cannot resolve attribute!")
+            raise AttributeError("Cannot resolve attribute '{}'! Allowed attributes: {}".format(
+                attr, ", ".join(sorted(self.__allowed))))
         try:
             return getattr(self.__session, attr)
         except AttributeError:
             return getattr(self.__context, attr)
 
-    def create(self, name=None, config=None, options=None, report=None):
+    def create(self, name=None, config=None, options=None, report=None, reset=False):
         """Create a new Spark session if needed
 
         Will use the name and configuration options provided to create a new
@@ -94,8 +99,10 @@ class SparkManager(object):
         :param options: environment options for launching the spark session
         :param report: filename to save a timing report
         :type report: str
+        :param reset: create a new Spark session
+        :type reset: bool
         """
-        if self.__session:
+        if self.__session and not reset:
             return self.__session
 
         # TODO auto-generate name?
@@ -139,7 +146,7 @@ class SparkManager(object):
 
         :param f: function to decorate
         """
-        n = f.func_name
+        n = f.__name__
         d = f.__doc__.strip() if f.__doc__ else ''
 
         def new_f(*args, **kwargs):
