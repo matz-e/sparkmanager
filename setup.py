@@ -1,16 +1,17 @@
-"""Installation setup for bbp.spark
+"""Installation setup
 """
 
 from setuptools import setup
 
 SPARKMANAGER_NAME = 'sparkmanager'
-SPARKMANAGER_VERSION = '0.2'
+SPARKMANAGER_VERSION = '0.2.1'
 
 
 setup(
     name=SPARKMANAGER_NAME,
     version=SPARKMANAGER_VERSION,
     description='A pyspark management framework',
+    long_description=open('README.rst').read(),
     author='Matthias Wolf',
     author_email='matthias.wolf@epfl.ch',
     license='MIT',
