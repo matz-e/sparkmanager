@@ -7,7 +7,7 @@ if [ -z "$SM_CUSTOMIZATION" ]; then
 if ! hash module 2> /dev/null; then
   . /etc/profile.d/modules.sh
 fi
-module load java/1.8u51
+export PATH=/nix/store/8536w2bxnzjfism4nqcjha0pgm6nqqx1-openjdk-8u152b16/bin:\$PATH
 EOF
     export SM_CUSTOMIZATION
 fi
@@ -28,7 +28,7 @@ create_work_environment() {
     cat > $workdir/conf/spark-defaults.conf <<EOF
 # see https://stackoverflow.com/questions/37871194/how-to-tune-spark-executor-number-cores-and-executor-memory
 spark.executor.cores=8
-spark.executor.memory=31g
+spark.executor.memory=30g
 
 # recommended, not the default due to backwards compatibility
 spark.serializer=org.apache.spark.serializer.KryoSerializer
@@ -62,6 +62,7 @@ EOF
 . $workdir/virtualenv/bin/activate
 
 export SPARK_HOME=$SPARK_HOME
+export SPARK_USER=$(whoami)
 
 export SPARK_CONF_DIR=$workdir/conf
 export SPARK_LOG_DIR=$workdir/log

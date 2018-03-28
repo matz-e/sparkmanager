@@ -182,11 +182,11 @@ _slurm_start_cluster() {
     workdir=$(readlink -f $workdir)
     envscript=$(readlink -f $envscript)
 
-    master=
+    master=none
     [[ -f "$workdir/spark_master" ]] && master=$(grep -oe '\(\w*\.\)\{1,\}\w*'<$workdir/spark_master)
 
     if [ -z "$(ssh $master jps -lm 2>/dev/null|grep org.apache.spark.deploy.master.Master)" ]; then
-        master=
+        master=none
         rm -f "$workdir/spark_master"
     fi
 
@@ -195,7 +195,7 @@ _slurm_start_cluster() {
         mkdir $workdir
     fi
 
-    if [ -z "$master" ]; then
+    if [ "$master" = "none" ]; then
         echo ">> Copying myself to working directory '$workdir'"
         cp $script $workdir
     else
@@ -221,7 +221,7 @@ _slurm_start_processes() {
 
     export SM_MASTER_MEMORY=${SM_MASTER_MEMORY:-4096}
 
-    if [[ -z "$master" && $SLURM_PROCID -eq 0 ]]; then
+    if [[ "$master" = "none" && $SLURM_PROCID -eq 0 ]]; then
         export SPARK_DAEMON_MEMORY=${SM_MASTER_MEMORY}m
         export SPARK_MASTER_IP=$(hostname)
 
@@ -231,10 +231,14 @@ _slurm_start_processes() {
         [[ "$output" == *failed* ]] && exit 1
     fi
 
+    if [[ "$master" = "none" ]]; then
+        master=
+    fi
+
     while [[ ! -f "$workdir/spark_master" ]]; do sleep 0.5s; done
 
-    export SPARK_WORKER_CORES=${SLURM_CPUS_PER_TASK:-$SLURM_CPUS_ON_NODE}
-    export SPARK_WORKER_MEMORY=$((${SLURM_MEM_PER_NODE:-$(($SLURM_CPUS_ON_NODE * $SLURM_MEM_PER_CPU))} - $SM_MASTER_MEMORY))m
+    export SPARK_WORKER_CORES=${SM_WORKER_CORES:-${SLURM_CPUS_PER_TASK:-$SLURM_CPUS_ON_NODE}}
+    export SPARK_WORKER_MEMORY=${SM_WORKER_MEMORY:-$((${SLURM_MEM_PER_NODE:-$(($SLURM_CPUS_ON_NODE * $SLURM_MEM_PER_CPU))} - $SM_MASTER_MEMORY))}m
 
     MASTER_NODE=${master:-spark://$(scontrol show hostname $SLURM_NODELIST | head -n 1):7077}
 
