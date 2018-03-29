@@ -1,4 +1,5 @@
 #!/bin/bash
+# vim: sw=4 et
 
 usage() {
     prog=$(basename $0)
@@ -39,6 +40,10 @@ _detect_allocation() {
     elif [ ! -z "$COBALT_NODEFILE" ]; then
         echo cobalt
     fi
+}
+
+_detect_memory() {
+    awk '/MemAvailable/ {print $2/1024}' /proc/meminfo
 }
 
 _cobalt_start_master() {
@@ -237,8 +242,16 @@ _slurm_start_processes() {
 
     while [[ ! -f "$workdir/spark_master" ]]; do sleep 0.5s; done
 
+    mem=${SM_WORKER_MEMORY:-$((${SLURM_MEM_PER_NODE:-$(($SLURM_CPUS_ON_NODE * $SLURM_MEM_PER_CPU))} - $SM_MASTER_MEMORY))}
+    detected=$(_detect_memory)
+
+    if [[ $(( $mem > $detected )) ]]; then
+        echo "> fixing memory to ${detected} MiB"
+        mem=$detected
+    fi
+
     export SPARK_WORKER_CORES=${SM_WORKER_CORES:-${SLURM_CPUS_PER_TASK:-$SLURM_CPUS_ON_NODE}}
-    export SPARK_WORKER_MEMORY=${SM_WORKER_MEMORY:-$((${SLURM_MEM_PER_NODE:-$(($SLURM_CPUS_ON_NODE * $SLURM_MEM_PER_CPU))} - $SM_MASTER_MEMORY))}m
+    export SPARK_WORKER_MEMORY=${mem}m
 
     MASTER_NODE=${master:-spark://$(scontrol show hostname $SLURM_NODELIST | head -n 1):7077}
 
