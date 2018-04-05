@@ -22,15 +22,25 @@ class SparkReport(object):
         self.__filename = filename
         self.__report = {
             'parallelism': manager.defaultParallelism,
+            'runtime': [],
             'timing': [[]],
             'version': manager.spark.version
         }
+        self.__start = time.time()
         if not os.path.exists(os.path.dirname(filename)):
             os.makedirs(os.path.dirname(filename))
         elif os.path.exists(filename):
             with open(filename, 'r') as fd:
                 data = json.load(fd)
                 self.__report['timing'] = data['timing'] + [[]]
+                self.__report['runtime'] = data['runtime']
+
+    def __del__(self):
+        """Save the final runtime upon object deletion
+        """
+        self.__report['runtime'].append(time.time() - self.__start)
+        with open(self.__filename, 'w') as fd:
+            json.dump(self.__report, fd)
 
     def __call__(self, name, delta):
         """Update stored information
