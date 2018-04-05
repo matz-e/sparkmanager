@@ -23,6 +23,8 @@ environment variables:
   SM_WORKDIR            The WORKDIR exported and accessible to the
                         ENVIRONMENT script.
 
+  SM_EXECUTE            Command to execute once the cluster has started.
+
 allocate resources with SLURM via:
 
     salloc -Aproj16 -pinteractive --exclusive --time 10:00:00 -N4
@@ -207,7 +209,14 @@ _slurm_start_cluster() {
         echo "<< Connecting to master $master"
     fi
 
-    srun $workdir/$(basename $script) _slurm_start_processes "$workdir" "$master" "$envscript"
+    srun $workdir/$(basename $script) _slurm_start_processes "$workdir" "$master" "$envscript" &> "$workdir/startup.log" &
+    if [ -n "$SM_EXECUTE" ]; then
+        eval "$SM_EXECUTE"
+        kill %1
+    else
+        tail -f "$workdir/startup.log"
+    fi
+
 }
 
 _slurm_stop_cluster() {
