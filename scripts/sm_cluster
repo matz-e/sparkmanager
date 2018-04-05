@@ -27,6 +27,8 @@ environment variables:
 
   SM_WORKER_MEMORY      Memory to allot to a worker.
 
+  SM_WORKER_COUNT       Limit number of workers.
+
   SM_EXECUTE            Command to execute once the cluster has started.
 
 allocate resources with SLURM via:
@@ -255,6 +257,10 @@ _slurm_start_processes() {
 
     if [[ "$master" = "none" ]]; then
         master=
+    fi
+
+    if [[ -n "$SM_WORKER_COUNT" && $SLURM_PROCID -ge $SM_WORKER_COUNT ]]; then
+        exit 0
     fi
 
     while [[ ! -f "$workdir/spark_master" ]]; do sleep 0.5s; done
