@@ -215,8 +215,12 @@ _slurm_start_cluster() {
 
     srun $workdir/$(basename $script) _slurm_start_processes "$workdir" "$master" "$envscript" &> "$workdir/startup.log" &
     if [ -n "$SM_EXECUTE" ]; then
+        echo ">> Sleeping 5s for cluster startup"
+        sleep 5
+        echo ">> Running executable"
         eval "$SM_EXECUTE"
-        kill %1
+        echo ">> Killing cluster"
+        pkill srun
     else
         tail -f "$workdir/startup.log"
     fi
