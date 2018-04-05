@@ -23,6 +23,10 @@ environment variables:
   SM_WORKDIR            The WORKDIR exported and accessible to the
                         ENVIRONMENT script.
 
+  SM_WORKER_CORES       Cores to allot to a worker.
+
+  SM_WORKER_MEMORY      Memory to allot to a worker.
+
   SM_EXECUTE            Command to execute once the cluster has started.
 
 allocate resources with SLURM via:
