@@ -5,6 +5,7 @@ from functools import update_wrapper
 from pyspark.sql import SparkSession, SQLContext
 from six import iteritems
 
+import atexit
 import json
 import os
 import time
@@ -35,12 +36,13 @@ class SparkReport(object):
                 self.__report['timing'] = data['timing'] + [[]]
                 self.__report['runtime'] = data['runtime']
 
-    def finish(self):
-        """Save the final runtime upon object deletion
-        """
-        self.__report['runtime'].append(time.time() - self.__start)
-        with open(self.__filename, 'w') as fd:
-            json.dump(self.__report, fd)
+        def finish():
+            """Save the final runtime upon object deletion
+            """
+            self.__report['runtime'].append(time.time() - self.__start)
+            with open(self.__filename, 'w') as fd:
+                json.dump(self.__report, fd)
+        atexit.register(finish)
 
     def __call__(self, name, delta):
         """Update stored information
