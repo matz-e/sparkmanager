@@ -35,7 +35,7 @@ class SparkReport(object):
                 self.__report['timing'] = data['timing'] + [[]]
                 self.__report['runtime'] = data['runtime']
 
-    def __del__(self):
+    def finish(self):
         """Save the final runtime upon object deletion
         """
         self.__report['runtime'].append(time.time() - self.__start)
