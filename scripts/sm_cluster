@@ -195,6 +195,13 @@ _slurm_start_cluster() {
     workdir=$(readlink -f $workdir)
     envscript=$(readlink -f $envscript)
 
+    if [[ -z "$SPARK_LOCAL_DIRS" && -d "/nvme" ]]; then
+        export SPARK_LOCAL_DIRS="/nvme/$(whoami)/$SLURM_JOBID"
+        export CLEANUP=Y
+        srun mkdir -p "$SPARK_LOCAL_DIRS"
+        trap "echo '>> Cleaning up';srun rm -rf \"$SPARK_LOCAL_DIRS\"" EXIT KILL
+    fi
+
     master=none
     [[ -f "$workdir/spark_master" ]] && master=$(grep -oe '\(\w*\.\)\{1,\}\w*'<$workdir/spark_master)
 
@@ -215,6 +222,7 @@ _slurm_start_cluster() {
         echo "<< Connecting to master $master"
     fi
 
+    touch "$workdir/startup.log"
     srun $workdir/$(basename $script) _slurm_start_processes "$workdir" "$master" "$envscript" &> "$workdir/startup.log" &
     if [ -n "$SM_EXECUTE" ]; then
         echo ">> Sleeping 5s for cluster startup"
@@ -226,7 +234,6 @@ _slurm_start_cluster() {
     else
         tail -f "$workdir/startup.log"
     fi
-
 }
 
 _slurm_stop_cluster() {
