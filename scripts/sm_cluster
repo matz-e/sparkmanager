@@ -303,6 +303,8 @@ _slurm_start_processes() {
         eval "$SM_EXECUTE"
         echo ">> Touching file $workdir/done"
         touch "$workdir/done"
+    elif [[ -n "$SM_EXECUTE" ]]; then
+        while [[ ! -f "$workdir/done" ]]; do sleep 10s; done
     else
         _slurm_sleep
     fi
