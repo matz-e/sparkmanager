@@ -182,11 +182,8 @@ _slurm_sleep() {
                     puts (diff * (24*60*60)).to_i
                 end"
     )
-    fn=$SM_WORKDIR/$(hostname)/sleep_$SLURM_JOBID
-    mkdir -p $(dirname $fn)
-    ln -sf $(which sleep) $fn
     echo "> Sleeping $time seconds"
-    $fn $time
+    sleep $time
 }
 
 _slurm_start_cluster() {
@@ -228,8 +225,19 @@ _slurm_start_cluster() {
         echo "<< Connecting to master $master"
     fi
 
+    if [ -n "$SM_EXECUTE" ]; then
+        rm -f "$workdir/done"
+    fi
+
     touch "$workdir/startup.log"
-    srun $workdir/$(basename $script) _slurm_start_processes "$workdir" "$master" "$envscript"
+    srun $workdir/$(basename $script) _slurm_start_processes "$workdir" "$master" "$envscript" &> "$workdir/startup.log"
+    if [ -n "$SM_EXECUTE" ]; then
+        while [[ ! -f "$workdir/done" ]]; do sleep 10s; done
+        echo ">> Killing cluster"
+        pkill srun
+    else
+        tail -f "$workdir/startup.log"
+    fi
 }
 
 _slurm_stop_cluster() {
@@ -291,14 +299,10 @@ _slurm_start_processes() {
     if [[ -n "$SM_EXECUTE" && $SLURM_PROCID -eq 0 ]]; then
         echo ">> Sleeping 5s for cluster startup"
         sleep 5
-        echo ">> Running executable $SM_EXECUTE"
+        echo ">> Running command $SM_EXECUTE"
         eval "$SM_EXECUTE"
-        echo ">> Killing keep-alive sleeps"
-        sleep 5
-        for host in $(scontrol show hostname $SLURM_NODELIST); do
-            ssh $host pkill sleep_$SLURMJOB_ID &
-        done
-        wait
+        echo ">> Touching file $workdir/done"
+        touch "$workdir/done"
     else
         _slurm_sleep
     fi
