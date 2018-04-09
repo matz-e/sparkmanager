@@ -229,14 +229,11 @@ _slurm_start_cluster() {
         rm -f "$workdir/done"
     fi
 
-    touch "$workdir/startup.log"
-    srun $workdir/$(basename $script) _slurm_start_processes "$workdir" "$master" "$envscript" &> "$workdir/startup.log"
+    srun $workdir/$(basename $script) _slurm_start_processes "$workdir" "$master" "$envscript"
     if [ -n "$SM_EXECUTE" ]; then
         while [[ ! -f "$workdir/done" ]]; do sleep 10s; done
         echo ">> Killing cluster"
         pkill srun
-    else
-        tail -f "$workdir/startup.log"
     fi
 }
 
