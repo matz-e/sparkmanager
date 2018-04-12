@@ -22,10 +22,16 @@ class SparkReport(object):
         """
         self.__filename = filename
         self.__report = {
-            'parallelism': manager.defaultParallelism,
             'runtime': [],
             'timing': [[]],
-            'version': manager.spark.version
+            'spark': {
+                'version': manager.spark.version,
+                'parallelism': manager.defaultParallelism,
+            },
+            'slurm': {
+                'jobid': os.environ.get('SLURM_JOBID', ''),
+                'nodes': os.environ.get('SLURM_NODELIST', ''),
+            }
         }
         self.__start = time.time()
         if not os.path.exists(os.path.dirname(filename)):
@@ -39,18 +45,20 @@ class SparkReport(object):
         def finish():
             """Save the final runtime upon object deletion
             """
-            self.__report['runtime'].append(time.time() - self.__start)
+            now = time.time()
+            self.__report['runtime'].append((now - self.__start, self.__start, now))
             with open(self.__filename, 'w') as fd:
                 json.dump(self.__report, fd)
         atexit.register(finish)
 
-    def __call__(self, name, delta):
+    def __call__(self, name, start, end):
         """Update stored information
 
         :param name: key to use
-        :param delta: timedifference to store
+        :param start: beginning timestamp
+        :param end: end timestamp
         """
-        self.__report['timing'][-1].append((name, delta))
+        self.__report['timing'][-1].append((name, (end - start, start, end)))
         with open(self.__filename, 'w') as fd:
             json.dump(self.__report, fd)
 
@@ -238,7 +246,7 @@ class SparkManager(object):
             yield
         finally:
             if self.__report:
-                self.__report(name, time.time() - start)
+                self.__report(name, start, time.time())
             self.__gstack.pop()
             self.__context.setJobGroup(*self.__gstack[-1])
 
