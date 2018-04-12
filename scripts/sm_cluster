@@ -325,6 +325,8 @@ startup() {
         usage
     fi
 
+    [[ ! -d "$workdir" ]] && mkdir -p "$workdir"
+
     echo ">>> Running on ${batch}"
     _${batch}_start_cluster "$workdir" "$envscript"
 }
