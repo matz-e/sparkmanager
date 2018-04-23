@@ -27,6 +27,7 @@ class SparkReport(object):
             'spark': {
                 'version': manager.spark.version,
                 'parallelism': manager.defaultParallelism,
+                'executors': manager._jsc.sc().getExecutorMemoryStatus().size(),
             },
             'slurm': {
                 'jobid': os.environ.get('SLURM_JOBID', ''),
