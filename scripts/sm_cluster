@@ -202,6 +202,7 @@ _slurm_start_cluster() {
         export CLEANUP=Y
         echo ">> Creating SPARK_LOCAL_DIRS='/nvme/$(whoami)/$SLURM_JOBID'"
         srun mkdir -p "$SPARK_LOCAL_DIRS"
+        srun sh -c 'echo "$(hostname): $(df -h|grep nvme)"'
         trap "echo '>> Cleaning up $SPARK_LOCAL_DIRS';srun rm -rf \"$SPARK_LOCAL_DIRS\"" EXIT KILL
     fi
 
