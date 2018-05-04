@@ -126,6 +126,7 @@ class SparkManager(object):
         :param name: the name of the spark application
         :param config: configuration parameters to be applied before
                        building the spark session
+        :type config:  a list of key, value pairs
         :param options: environment options for launching the spark session
         :param report: filename to save a timing report
         :type report: str
@@ -145,7 +146,7 @@ class SparkManager(object):
         session = SparkSession.builder.appName(name)
 
         if config:
-            for k, v in iteritems(config):
+            for k, v in config:
                 session.config(k, v)
 
         self.__session = session.getOrCreate()
