@@ -29,6 +29,8 @@ environment variables:
 
   SM_WORKER_COUNT       Limit number of workers.
 
+  SM_HADOOP_COUNT       Limit number of Hadoop name nodes
+
   SM_EXECUTE            Command to execute once the cluster has started.
 
 allocate resources with SLURM via:
@@ -243,6 +245,76 @@ _slurm_stop_cluster() {
     echo "!!! Just kill the allocation"
 }
 
+_hdfs_start_processes() {
+    workdir=$1
+
+    [[ -z "$workdir" ]] && usage
+
+    [[ -z "$HADOOP_HOME" ]] && exit
+
+    export HDFS_MASTER_NODE=
+    export HDFS_DATA_DIR=$workdir/hadoop/data/$SLURM_JOBID
+    export HDFS_TMP_DIR=$workdir/hadoop/tmp/$SLURM_JOBID
+    export HDFS_NAME_DIR=$workdir/hadoop/name/$SLURM_JOBID
+
+    export HADOOP_CONF_DIR=$workdir/hadoop/conf/$SLURM_JOBID
+
+cat << EOF > $HADOOP_CONF_DIR/core-site.xml
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<configuration>
+<property>
+  <name>hadoop.tmp.dir</name>
+  <value>$HDFS_TMP_DIR</value>
+  <description>A base for other temporary directories.</description>
+</property>
+<property>
+  <name>fs.defaultFS</name>
+  <value>hdfs://$HDFS_MASTER_NODE:54310</value>
+</property>
+</configuration>
+EOF
+
+cat << EOF > $HADOOP_CONF_DIR/hdfs-site.xml
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<configuration>
+  <property>
+    <name>dfs.namenode.name.dir</name>
+    <value>$HDFS_NAME_DIR</value>
+    <description>Determines where on the local filesystem the DFS name node should store the name table.  If this is a comma-delimited list of directories then the name table is replicated in all of the directories, for redundancy. </description>
+    <final>true</final>
+  </property>
+  <property>
+    <name>dfs.datanode.data.dir</name>
+    <value>$HDFS_DATA_DIR</value>
+    <description>Determines where on the local filesystem an DFS data node should store its blocks.  If this is a comma-delimited list of directories, then data will be stored in all named directories, typically on different devices.  Directories that do not exist are ignored.  </description>
+    <final>true</final>
+  </property>
+  <property>
+   <name>dfs.namenode.secondary.http-address</name>
+   <value>$HDFS_MASTER_NODE:50090</value>
+   <description>The secondary namenode http server address and port.</description>
+   <final>true</final>
+  </property>
+  <property>
+    <name>dfs.replication</name>
+    <value>1</value>
+    <final>true</final>
+  </property>
+</configuration>
+EOF
+
+    $HADOOP_HOME/bin/hadoop namenode -format
+    if [[ $SLURM_PROCID -eq 0 ]]; then
+        $HADOOP_HOME/bin/hadoop-daemon.sh --config $HADOOP_CONF_DIR --script hdfs start namenode
+        sleep 5s
+        touch $workdir/hadoop/namenode
+    fi
+    while [[ ! -f "$workdir/hadoop/namenode" ]]; do sleep 0.5s; done
+    $HADOOP_HOME/bin/hadoop-daemon.sh --config $HADOOP_CONF_DIR --script hdfs start datanode
+}
+
 _slurm_start_processes() {
     workdir=$1
     master=$2
@@ -252,6 +324,8 @@ _slurm_start_processes() {
     export SM_WORKDIR="$workdir"
 
     [[ -f "$envscript" ]] && . $envscript
+
+    _hdfs_start_processes "$workdir"
 
     export SM_MASTER_MEMORY=${SM_MASTER_MEMORY:-4096}
 
