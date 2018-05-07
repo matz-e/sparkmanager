@@ -252,10 +252,10 @@ _hdfs_start_processes() {
 
     [[ -z "$HADOOP_HOME" ]] && exit
 
-    export HDFS_MASTER_NODE=
+    export HDFS_MASTER_NODE=$(scontrol show hostname $SLURM_NODELIST|head -n 1)
     export HDFS_DATA_DIR=$workdir/hadoop/data/$SLURM_JOBID
     export HDFS_TMP_DIR=$workdir/hadoop/tmp/$SLURM_JOBID
-    export HDFS_NAME_DIR=$workdir/hadoop/name/$SLURM_JOBID
+    export HDFS_NAME_DIR=$workdir/hadoop/name/
 
     export HADOOP_CONF_DIR=$workdir/hadoop/conf/$SLURM_JOBID
 
@@ -305,8 +305,8 @@ cat << EOF > $HADOOP_CONF_DIR/hdfs-site.xml
 </configuration>
 EOF
 
-    $HADOOP_HOME/bin/hadoop namenode -format
     if [[ $SLURM_PROCID -eq 0 ]]; then
+        $HADOOP_HOME/bin/hdfs namenode -format
         $HADOOP_HOME/bin/hadoop-daemon.sh --config $HADOOP_CONF_DIR --script hdfs start namenode
         sleep 5s
         touch $workdir/hadoop/namenode
