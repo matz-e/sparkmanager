@@ -205,7 +205,8 @@ _slurm_start_cluster() {
         echo ">> Creating SPARK_LOCAL_DIRS='/nvme/$(whoami)/$SLURM_JOBID'"
         srun mkdir -p "$SPARK_LOCAL_DIRS"
         srun sh -c 'echo "$(hostname): $(df -h|grep nvme)"'
-        trap "echo '>> Cleaning up $SPARK_LOCAL_DIRS';srun rm -rf \"$SPARK_LOCAL_DIRS\"" EXIT KILL
+        # This will get stuck in the current configuration
+        # trap "echo '>> Cleaning up $SPARK_LOCAL_DIRS';srun rm -rf \"$SPARK_LOCAL_DIRS\"" EXIT KILL
     fi
 
     master=none
@@ -249,17 +250,18 @@ _hdfs_start_processes() {
     workdir=$1
 
     [[ -z "$workdir" ]] && usage
-
     [[ -z "$HADOOP_HOME" ]] && exit
 
     export HDFS_MASTER_NODE=$(scontrol show hostname $SLURM_NODELIST|head -n 1)
-    export HDFS_DATA_DIR=$workdir/hadoop/data/$SLURM_JOBID
-    export HDFS_TMP_DIR=$workdir/hadoop/tmp/$SLURM_JOBID
+    export HDFS_DATA_DIR=/nvme/$(whoami)/$SLURM_JOBID/hadoop/data/$SLURM_JOBID.$SLURM_PROCID
+    export HDFS_TMP_DIR=/nvme/$(whoami)/$SLURM_JOBID/hadoop/tmp/$SLURM_JOBID.$SLURM_PROCID
     export HDFS_NAME_DIR=$workdir/hadoop/name/
 
-    export HADOOP_CONF_DIR=$workdir/hadoop/conf/$SLURM_JOBID
+    export HADOOP_CONF_DIR=$workdir/hadoop/conf/$SLURM_JOBID.$SLURM_PROCID
 
-cat << EOF > $HADOOP_CONF_DIR/core-site.xml
+    mkdir -p "$HDFS_DATA_DIR" "$HDFS_TMP_DIR" "$HDFS_NAME_DIR" "$HADOOP_CONF_DIR"
+
+    cat > "$HADOOP_CONF_DIR/core-site.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
 <configuration>
@@ -275,7 +277,7 @@ cat << EOF > $HADOOP_CONF_DIR/core-site.xml
 </configuration>
 EOF
 
-cat << EOF > $HADOOP_CONF_DIR/hdfs-site.xml
+    cat > "$HADOOP_CONF_DIR/hdfs-site.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
 <configuration>
@@ -306,13 +308,13 @@ cat << EOF > $HADOOP_CONF_DIR/hdfs-site.xml
 EOF
 
     if [[ $SLURM_PROCID -eq 0 ]]; then
-        $HADOOP_HOME/bin/hdfs namenode -format
-        $HADOOP_HOME/bin/hadoop-daemon.sh --config $HADOOP_CONF_DIR --script hdfs start namenode
+        $HADOOP_HOME/bin/hdfs namenode -format -force -nonInteractive
+        $HADOOP_HOME/sbin/hadoop-daemon.sh --config $HADOOP_CONF_DIR --script hdfs start namenode &
         sleep 5s
         touch $workdir/hadoop/namenode
     fi
     while [[ ! -f "$workdir/hadoop/namenode" ]]; do sleep 0.5s; done
-    $HADOOP_HOME/bin/hadoop-daemon.sh --config $HADOOP_CONF_DIR --script hdfs start datanode
+    $HADOOP_HOME/sbin/hadoop-daemon.sh --config $HADOOP_CONF_DIR --script hdfs start datanode &
 }
 
 _slurm_start_processes() {
