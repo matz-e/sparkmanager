@@ -12,6 +12,7 @@ setup(
     version=SPARKMANAGER_VERSION,
     description='A pyspark management framework',
     long_description=open('README.rst').read(),
+    long_description_content_type='text/x-rst',
     author='Matthias Wolf',
     author_email='matthias.wolf@epfl.ch',
     license='MIT',
