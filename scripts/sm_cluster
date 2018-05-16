@@ -258,8 +258,9 @@ _hdfs_start_processes() {
     export HDFS_NAME_DIR=$workdir/hadoop/name/
 
     export HADOOP_CONF_DIR=$workdir/hadoop/conf/$SLURM_JOBID.$SLURM_PROCID
+    export HADOOP_LOG_DIR=$workdir/hadoop/logs
 
-    mkdir -p "$HDFS_DATA_DIR" "$HDFS_TMP_DIR" "$HDFS_NAME_DIR" "$HADOOP_CONF_DIR"
+    mkdir -p "$HDFS_DATA_DIR" "$HDFS_TMP_DIR" "$HDFS_NAME_DIR" "$HADOOP_CONF_DIR" "$HADOOP_LOG_DIR"
 
     cat > "$HADOOP_CONF_DIR/core-site.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -283,7 +284,7 @@ EOF
 <configuration>
   <property>
     <name>dfs.namenode.name.dir</name>
-    <value>$HDFS_NAME_DIR</value>
+    <value>file://$HDFS_NAME_DIR</value>
     <description>Determines where on the local filesystem the DFS name node should store the name table.  If this is a comma-delimited list of directories then the name table is replicated in all of the directories, for redundancy. </description>
     <final>true</final>
   </property>
@@ -310,7 +311,7 @@ EOF
     if [[ $SLURM_PROCID -eq 0 ]]; then
         $HADOOP_HOME/bin/hdfs namenode -format -force -nonInteractive
         $HADOOP_HOME/sbin/hadoop-daemon.sh --config $HADOOP_CONF_DIR --script hdfs start namenode &
-        sleep 5s
+        sleep 15s
         touch $workdir/hadoop/namenode
     fi
     while [[ ! -f "$workdir/hadoop/namenode" ]]; do sleep 0.5s; done
@@ -328,6 +329,9 @@ _slurm_start_processes() {
     [[ -f "$envscript" ]] && . $envscript
 
     _hdfs_start_processes "$workdir"
+
+    export SPARK_LOG_DIR="$workdir/logs"
+    export SPARK_WORKER_DIR="$workdir/work"
 
     export SM_MASTER_MEMORY=${SM_MASTER_MEMORY:-4096}
 
