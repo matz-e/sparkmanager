@@ -29,7 +29,8 @@ The module itself acts as a mediator to Spark:
    import sparkmanager as sm
 
    # Create a new application
-   sm.create("My fancy name")
+   sm.create("My fancy name",
+             [("spark.executor.cores", 4), ("spark.executor.memory", "8g")])
 
    data = sm.spark.range(5)
    # Will show up in the UI with the name "broadcasting some data"
