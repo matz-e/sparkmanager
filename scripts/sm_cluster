@@ -200,13 +200,13 @@ _slurm_start_cluster() {
     nvme=$(srun ls /|grep nvme)
 
     if [[ -z "$SPARK_LOCAL_DIRS" && -n "$nvme" ]]; then
-        export SPARK_LOCAL_DIRS="/nvme/$(whoami)/$SLURM_JOBID"
-        export CLEANUP=Y
+        export SPARK_LOCAL_DIRS="/nvme/$(whoami)/$SLURM_JOBID/spark-local"
+        export SPARK_WORKER_DIR="/nvme/$(whoami)/$SLURM_JOBID/spark-worker"
         echo ">> Creating SPARK_LOCAL_DIRS='/nvme/$(whoami)/$SLURM_JOBID'"
-        srun mkdir -p "$SPARK_LOCAL_DIRS"
+        srun mkdir -p "$SPARK_LOCAL_DIRS" "$SPARK_WORKER_DIR"
         srun sh -c 'echo "$(hostname): $(df -h|grep nvme)"'
-        # This will get stuck in the current configuration
-        # trap "echo '>> Cleaning up $SPARK_LOCAL_DIRS';srun rm -rf \"$SPARK_LOCAL_DIRS\"" EXIT KILL
+    else
+        export SPARK_WORKER_DIR="$workdir/work"
     fi
 
     master=none
@@ -331,7 +331,6 @@ _slurm_start_processes() {
     _hdfs_start_processes "$workdir"
 
     export SPARK_LOG_DIR="$workdir/logs"
-    export SPARK_WORKER_DIR="$workdir/work"
 
     export SM_MASTER_MEMORY=${SM_MASTER_MEMORY:-4096}
 

@@ -4,7 +4,7 @@
 from setuptools import setup
 
 SPARKMANAGER_NAME = 'sparkmanager'
-SPARKMANAGER_VERSION = '0.5.2'
+SPARKMANAGER_VERSION = '0.5.3'
 
 
 setup(
