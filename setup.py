@@ -4,7 +4,7 @@
 from setuptools import setup
 
 SPARKMANAGER_NAME = 'sparkmanager'
-SPARKMANAGER_VERSION = '0.5.3'
+SPARKMANAGER_VERSION = '0.5.4'
 
 
 setup(
@@ -41,6 +41,9 @@ setup(
         'pytest-cov'
     ],
     scripts=[
-        'scripts/sm_cluster'
+        'scripts/sm_cluster',
+        'scripts/sm_run',
+        'scripts/sm_startup',
+        'scripts/sm_shutdown',
     ]
 )

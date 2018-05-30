@@ -1,18 +1,26 @@
 #!/bin/bash
 # vim: sw=4 et
 
+set -x
+set -e
+
 usage() {
-    prog=$(basename $0)
     cat 1>&2 <<EOF
-usage: $prog startup WORKDIR [ENVIRONMENT]
-       $prog shutdown
+usage: sm_run [-c SM_WORKER_CORES] [-m SM_WORKER_MEMORY] [-H|-h HADOOP_HOME] [-w WORKDIR] [-e ENVIRONMENT] COMMAND ARGS…
+       sm_startup WORKDIR [ENVIRONMENT]
+       sm_shutdown
+
+special options:
+  -H   Disabe HADOOP support.
 
 positional arguments:
-  WORKDIR       Working directory to use.
+  WORKDIR       Working directory to use. Defaults to ./_cluster.
   ENVIRONMENT   Script to source to obtain the right environment.
-                Will be automatically looked for in $WORKDIR.
+                Will be automatically looked for in \$WORKDIR, \$SPARK_CONF_DIR, \$SPARK_HOME.
 
-environment variables:
+environment variables to configure behavior:
+  HADOOP_HOME           If set, will spawn a HADOOP cluster.
+
   SM_MASTER_MEMORY      Memory to dedicate to the master. Will be
                         subtracted from the detected machine memory when
                         calculating the memory allocation for workers.
@@ -243,14 +251,16 @@ _slurm_start_cluster() {
 }
 
 _slurm_stop_cluster() {
-    echo "!!! Just kill the allocation"
+    workdir=$1
+    [[ -z "$workdir" ]] && usage
+    touch "$workdir/done"
 }
 
 _hdfs_start_processes() {
     workdir=$1
 
     [[ -z "$workdir" ]] && usage
-    [[ -z "$HADOOP_HOME" ]] && exit
+    [[ -z "$HADOOP_HOME" ]] && return
 
     export HDFS_MASTER_NODE=$(scontrol show hostname $SLURM_NODELIST|head -n 1)
     export HDFS_DATA_DIR=/nvme/$(whoami)/$SLURM_JOBID/hadoop/data/$SLURM_JOBID.$SLURM_PROCID
@@ -379,10 +389,8 @@ _slurm_start_processes() {
         sleep 5
         echo ">> Running command $SM_EXECUTE"
         eval "$SM_EXECUTE; echo \$? > $workdir/done"
-    elif [[ -n "$SM_EXECUTE" ]]; then
-        while [[ ! -f "$workdir/done" ]]; do sleep 10s; done
     else
-        _slurm_sleep
+        while [[ ! -f "$workdir/done" ]]; do sleep 10s; done
     fi
 }
 
@@ -391,14 +399,20 @@ startup() {
     envscript=$2
     batch=$(_detect_allocation)
 
+    [[ -z "$workdir" ]] && workdir=./_cluster
+
     if [ -z "$batch" ]; then
-        echo "!!! Cannot detect batch system"
-        usage
+        echo "cannot detect batch system"
+        exit 2
     fi
 
     test="$workdir/env.sh"
     [[ -z "$envscript" && -f "$test" ]] && envscript="$test"
     test="$workdir/spark-env.sh"
+    [[ -z "$envscript" && -f "$test" ]] && envscript="$test"
+    test="$SPARK_CONF_DIR/conf/spark-env.sh"
+    [[ -z "$envscript" && -f "$test" ]] && envscript="$test"
+    test="$SPARK_HOME/conf/spark-env.sh"
     [[ -z "$envscript" && -f "$test" ]] && envscript="$test"
 
     if [ -z "$workdir" ]; then
@@ -408,7 +422,12 @@ startup() {
     [[ ! -d "$workdir" ]] && mkdir -p "$workdir"
 
     echo ">>> Running on ${batch}"
+    echo ">>> Working directory:  ${workdir}"
+    echo ">>> Environment script: ${envscript}"
+    echo ">>> Dedicated environment variables:"
+    env|egrep '^SM_'
     _${batch}_start_cluster "$workdir" "$envscript"
+    exit $?
 }
 
 shutdown() {
@@ -434,8 +453,54 @@ shutdown() {
     _${batch}_stop_cluster "$workdir" "$envscript"
 }
 
-cmd=$1
-shift
+run() {
+    workdir=
+    envscript=
+    while getopts "c:e:Hh:m:w:" opt; do
+        case $opt in
+            c)
+                export SM_WORKER_CORES=$OPTARG
+                ;;
+            m)
+                export SM_WORKER_MEMORY=$OPTARG
+                ;;
+            h)
+                export HADOOP_HOME=$OPTARG
+                ;;
+            H)
+                export HADOOP_HOME=""
+                ;;
+            w)
+                workdir=$OPTARG
+                ;;
+            e)
+                envscript=$OPTARG
+                ;;
+            \?)
+                echo "invalid option: -$OPTARG" >&2
+                usage
+                ;;
+            :)
+                echo "option -$OPTARG requires an argument" >&2
+                usage
+                ;;
+        esac
+    done
+    shift $(( $OPTIND - 1 ))
+    [ $# -ge 1 ] || usage
+    export SM_EXECUTE="$*"
+
+    startup "$workdir" "$envscript"
+    exit $?
+}
+
+if [ $(basename $0) == "sm_cluster" ]; then
+    cmd=$1
+    shift
+else
+    base=$(basename $0)
+    cmd=${base##sm_}
+fi
 
 [ -z "$(type $cmd 2> /dev/null|grep function)" ] && usage
 $cmd $*
