@@ -38,11 +38,11 @@ environment variables to configure behavior:
 
   SM_WORKER_COUNT       Limit number of workers.
 
-  SM_HADOOP_COUNT       Limit number of Hadoop name nodes
+  SM_HADOOP_COUNT       Limit number of Hadoop name nodes.
 
   SM_EXECUTE            Command to execute once the cluster has started.
 
-  SM_VERBOSE            Print all commands before executing them, via `set -x`
+  SM_VERBOSE            Print all commands before executing them, via `set -x`.
 
 allocate resources with SLURM via:
 
