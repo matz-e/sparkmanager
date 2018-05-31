@@ -204,7 +204,8 @@ _slurm_start_cluster() {
     envscript=$2
     [[ -z "$workdir" ]] && usage
 
-    script=$(readlink -f $0)
+    myself=$(readlink -f $0)
+    script=sm_cluster
     workdir=$(readlink -f $workdir)
     envscript=$(readlink -f $envscript)
 
@@ -235,7 +236,7 @@ _slurm_start_cluster() {
 
     if [ "$master" = "none" ]; then
         echo ">> Copying myself to working directory '$workdir'"
-        cp $script $workdir
+        cp $myself $workdir/$script
     else
         echo "<< Connecting to master $master"
     fi
@@ -244,7 +245,7 @@ _slurm_start_cluster() {
         rm -f "$workdir/done"
     fi
 
-    srun $workdir/$(basename $script) _slurm_start_processes "$workdir" "$master" "$envscript"
+    srun $workdir/$script _slurm_start_processes "$workdir" "$master" "$envscript"
     if [ -n "$SM_EXECUTE" ]; then
         while [[ ! -f "$workdir/done" ]]; do sleep 10s; done
         code=$(cat "$workdir/done")
