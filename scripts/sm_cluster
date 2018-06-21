@@ -7,7 +7,8 @@ fi
 
 usage() {
     cat 1>&2 <<EOF
-usage: sm_run [-c SM_WORKER_CORES] [-m SM_WORKER_MEMORY] [-H|-h HADOOP_HOME] [-w WORKDIR] [-e ENVIRONMENT] COMMAND ARGS…
+usage: sm_run [-c SM_WORKER_CORES] [-m SM_WORKER_MEMORY] [-H|-h HADOOP_HOME] [-s SM_HDFS_HOST]
+              [-w WORKDIR] [-e ENVIRONMENT] COMMAND ARGS…
        sm_startup WORKDIR [ENVIRONMENT]
        sm_shutdown
 
@@ -21,6 +22,13 @@ positional arguments:
 
 environment variables to configure behavior:
   HADOOP_HOME           If set, will spawn a HADOOP cluster.
+
+  SM_HDFS_DIRS          Local directories to use for the HADOOP cluster.
+                        Will default to /nvme/\$(whoami)/\$SLURM_JOBID/hadoop.
+
+  SM_HDFS_HOST          HDFS server to connect to. This will assume the FS
+                        running on port 9000 and the web-interface
+                        accessible on port 50070.
 
   SM_MASTER_MEMORY      Memory to dedicate to the master. Will be
                         subtracted from the detected machine memory when
@@ -37,8 +45,6 @@ environment variables to configure behavior:
   SM_WORKER_MEMORY      Memory to allot to a worker.
 
   SM_WORKER_COUNT       Limit number of workers.
-
-  SM_HADOOP_COUNT       Limit number of Hadoop name nodes.
 
   SM_EXECUTE            Command to execute once the cluster has started.
 
@@ -260,15 +266,98 @@ _slurm_stop_cluster() {
     touch "$workdir/done"
 }
 
+_hdfs_configure_mapper() {
+    workdir=$1
+    host=$2
+
+    [[ -z "$workdir" ]] && usage
+    [[ -z "$HADOOP_HOME" ]] && return
+    [[ $SLURM_PROCID -ne 0 ]] && return
+
+    export HADOOP_CONF_DIR=$workdir/hadoop/conf/$SLURM_JOBID
+    mkdir -p "$HADOOP_CONF_DIR"
+
+    cat > "$HADOOP_CONF_DIR/core-site.xml" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<configuration>
+  <property>
+    <name>fs.defaultFS</name>
+    <value>hdfs://$host:9000</value>
+  </property>
+</configuration>
+EOF
+    cat > "$HADOOP_CONF_DIR/hdfs-site.xml" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<configuration>
+  <property>
+    <name>dfs.namenode.http-address</name>
+    <value>http://${host}:50070</value>
+    <final>true</final>
+  </property>
+  <property>
+    <name>dfs.replication</name>
+    <value>1</value>
+  </property>
+  <property>
+    <name>dfs.blocksize</name>
+    <value></value>
+  </property>
+  <property>
+    <name>dfs.datanode.max.transfer.threads</name>
+    <value>8192</value>
+  </property>
+</configuration>
+EOF
+    cat > "$HADOOP_CONF_DIR/gpfs-site.xml" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<configuration>
+  <property>
+    <name>gpfs.mnt.dir</name>
+    <value>/gpfs/bbp.cscs.ch/data</value>
+  </property>
+  <property>
+    <name>gpfs.data.dir</name>
+    <value></value>
+  </property>
+  <property>
+    <name>gpfs.supergroup</name>
+    <value>hadoop,bbp</value>
+  </property>
+  <property>
+    <name>gpfs.storage.type</name>
+    <value>local</value>
+  </property>
+  <property>
+    <name>gpfs.replica.enforced</name>
+    <value>dfs</value>
+  </property>
+  <property>
+    <name>gpfs.ranger.enabled</name>
+    <value>true</value>
+  </property>
+</configuration>
+EOF
+}
+
 _hdfs_start_processes() {
     workdir=$1
+
+    SM_HDFS_DIRS=${SM_HDFS_DIRS:-/nvme/$(whoami)/$SLURM_JOBID/hadoop}
 
     [[ -z "$workdir" ]] && usage
     [[ -z "$HADOOP_HOME" ]] && return
 
+    if [[ -n "$SM_HDFS_HOST" ]]; then
+        _hdfs_configure_mapper "$workdir" "$SM_HDFS_HOST"
+        return
+    fi
+
     export HDFS_MASTER_NODE=$(scontrol show hostname $SLURM_NODELIST|head -n 1)
-    export HDFS_DATA_DIR=/nvme/$(whoami)/$SLURM_JOBID/hadoop/data/$SLURM_JOBID.$SLURM_PROCID
-    export HDFS_TMP_DIR=/nvme/$(whoami)/$SLURM_JOBID/hadoop/tmp/$SLURM_JOBID.$SLURM_PROCID
+    export HDFS_DATA_DIR=$SM_HDFS_DIRS/data/$SLURM_JOBID.$SLURM_PROCID
+    export HDFS_TMP_DIR=$SM_HDFS_DIRS/tmp/$SLURM_JOBID.$SLURM_PROCID
     export HDFS_NAME_DIR=$workdir/hadoop/name/
 
     export HADOOP_CONF_DIR=$workdir/hadoop/conf/$SLURM_JOBID.$SLURM_PROCID
@@ -460,7 +549,7 @@ shutdown() {
 run() {
     workdir=
     envscript=
-    while getopts "c:e:Hh:m:w:" opt; do
+    while getopts "c:e:Hh:s:m:w:" opt; do
         case $opt in
             c)
                 export SM_WORKER_CORES=$OPTARG
@@ -473,6 +562,9 @@ run() {
                 ;;
             H)
                 export HADOOP_HOME=""
+                ;;
+            s)
+                export SM_HDFS_HOST=$OPTARG
                 ;;
             w)
                 workdir=$OPTARG
