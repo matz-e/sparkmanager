@@ -363,6 +363,13 @@ _hdfs_start_processes() {
     export HADOOP_CONF_DIR=$workdir/hadoop/conf/$SLURM_JOBID.$SLURM_PROCID
     export HADOOP_LOG_DIR=$workdir/hadoop/logs
 
+    webhost=$HDFS_MASTER_NODE
+    # Proxy requires FQDN - assume localized running with the same domain
+    # name as localhost.
+    if [[ ! *.* = $webhost ]]; then
+        webhost=${webhost}.$(hostname -d)
+    fi
+
     mkdir -p "$HDFS_DATA_DIR" "$HDFS_TMP_DIR" "$HDFS_NAME_DIR" "$HADOOP_CONF_DIR" "$HADOOP_LOG_DIR"
 
     cat > "$HADOOP_CONF_DIR/core-site.xml" <<EOF
@@ -372,7 +379,6 @@ _hdfs_start_processes() {
 <property>
   <name>hadoop.tmp.dir</name>
   <value>$HDFS_TMP_DIR</value>
-  <description>A base for other temporary directories.</description>
 </property>
 <property>
   <name>fs.defaultFS</name>
@@ -388,20 +394,22 @@ EOF
   <property>
     <name>dfs.namenode.name.dir</name>
     <value>file://$HDFS_NAME_DIR</value>
-    <description>Determines where on the local filesystem the DFS name node should store the name table.  If this is a comma-delimited list of directories then the name table is replicated in all of the directories, for redundancy. </description>
     <final>true</final>
   </property>
   <property>
     <name>dfs.datanode.data.dir</name>
     <value>$HDFS_DATA_DIR</value>
-    <description>Determines where on the local filesystem an DFS data node should store its blocks.  If this is a comma-delimited list of directories, then data will be stored in all named directories, typically on different devices.  Directories that do not exist are ignored.  </description>
     <final>true</final>
   </property>
   <property>
-   <name>dfs.namenode.secondary.http-address</name>
-   <value>$HDFS_MASTER_NODE:50090</value>
-   <description>The secondary namenode http server address and port.</description>
-   <final>true</final>
+    <name>dfs.namenode.http-address</name>
+    <value>http://${webhost}:50070</value>
+    <final>true</final>
+  </property>
+  <property>
+    <name>dfs.namenode.secondary.http-address</name>
+    <value>http://${webhost}:50090</value>
+    <final>true</final>
   </property>
   <property>
     <name>dfs.replication</name>
