@@ -7,13 +7,15 @@ fi
 
 usage() {
     cat 1>&2 <<EOF
-usage: sm_run [-c SM_WORKER_CORES] [-m SM_WORKER_MEMORY] [-H|-h HADOOP_HOME] [-s SM_HDFS_HOST]
-              [-w WORKDIR] [-e ENVIRONMENT] COMMAND ARGS…
+usage: sm_run [-c SM_WORKER_CORES] [-m SM_WORKER_MEMORY] [-H|-h HADOOP_HOME]
+              [-s SM_HDFS_HOST] [-w WORKDIR] [-e ENVIRONMENT] COMMAND ARGS…
        sm_startup WORKDIR [ENVIRONMENT]
        sm_shutdown
 
 special options:
   -H   Disabe HADOOP support.
+
+for other options, see the environment variable given as option argument.
 
 positional arguments:
   WORKDIR       Working directory to use. Defaults to ./_cluster.
@@ -129,7 +131,7 @@ _cobalt_start_cluster() {
 
     if [ -z "$master" ]; then
         echo ">> Copying myself to working directory '$workdir'"
-        cp $script $workdir
+        cp -f $script $workdir
 
         master=$(head -n 1 "$COBALT_NODEFILE")
         ssh $master "$workdir/$(basename $script)" _cobalt_start_master "$workdir" "$envscript"
@@ -242,7 +244,7 @@ _slurm_start_cluster() {
 
     if [ "$master" = "none" ]; then
         echo ">> Copying myself to working directory '$workdir'"
-        cp $myself $workdir/$script
+        cp -f $myself $workdir/$script
     else
         echo "<< Connecting to master $master"
     fi
@@ -370,6 +372,7 @@ _hdfs_start_processes() {
         webhost=${webhost}.$(hostname -d)
     fi
 
+    rm -rf "$HDFS_DATA_DIR" "$HDFS_TMP_DIR"
     mkdir -p "$HDFS_DATA_DIR" "$HDFS_TMP_DIR" "$HDFS_NAME_DIR" "$HADOOP_CONF_DIR" "$HADOOP_LOG_DIR"
 
     cat > "$HADOOP_CONF_DIR/core-site.xml" <<EOF
@@ -492,7 +495,7 @@ _slurm_start_processes() {
         echo ">> Sleeping 5s for cluster startup"
         sleep 5
         echo ">> Running command $SM_EXECUTE"
-        eval "$SM_EXECUTE; echo \$? > $workdir/done"
+        eval "$SM_EXECUTE|tee $workdir/stdout; echo \$? > $workdir/done"
     else
         while [[ ! -f "$workdir/done" ]]; do sleep 10s; done
     fi
@@ -560,7 +563,7 @@ shutdown() {
 run() {
     workdir=
     envscript=
-    while getopts "c:e:Hh:s:m:w:" opt; do
+    while getopts "c:e:Hh:p:s:m:w:" opt; do
         case $opt in
             c)
                 export SM_WORKER_CORES=$OPTARG
