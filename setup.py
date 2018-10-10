@@ -4,21 +4,19 @@
 from setuptools import setup
 
 SPARKMANAGER_NAME = 'sparkmanager'
-SPARKMANAGER_VERSION = '0.6.0'
 
 
 setup(
     name=SPARKMANAGER_NAME,
-    version=SPARKMANAGER_VERSION,
     description='A pyspark management framework',
     long_description=open('README.rst').read(),
     long_description_content_type='text/x-rst',
+    use_scm_version=True,
     author='Matthias Wolf',
     author_email='matthias.wolf@epfl.ch',
     license='MIT',
     keywords=['apache-spark'],
     url='https://github.com/matz-e/sparkmanager',
-    download_url='https://github.com/matz-e/sparkmanager/archive/{}.tar.gz'.format(SPARKMANAGER_VERSION),
     classifiers=[
         'Development Status :: 3 - Alpha',
         'License :: OSI Approved :: MIT License',
@@ -34,7 +32,8 @@ setup(
         'six'
     ],
     setup_requires=[
-        'pytest-runner'
+        'pytest-runner',
+        'setuptools-scm',
     ],
     tests_require=[
         'pytest',

@@ -10,6 +10,8 @@ import json
 import os
 import time
 
+from .eventlog import EventLog
+
 
 class SparkReport(object):
     """Save time differences to a file
@@ -35,6 +37,10 @@ class SparkReport(object):
             }
         }
         self.__start = time.time()
+        self.__eventlog = None
+        logdir = manager.getConf().get('spark.eventLog.dir')
+        if logdir:
+            self.__eventlog = os.path.join(logdir, manager.getConf().get('spark.app.id') + '.inprogress')
         if not os.path.exists(os.path.dirname(filename)):
             os.makedirs(os.path.dirname(filename))
         elif os.path.exists(filename):
@@ -48,6 +54,11 @@ class SparkReport(object):
             """
             now = time.time()
             self.__report['runtime'].append((now - self.__start, self.__start, now))
+            if self.__eventlog:
+                log = EventLog(self.__eventlog)
+                self.__report['spark']['shuffle'] = log.shuffle_size
+                self.__report['spark']['rows_max'] = log.max_rows
+                self.__report['spark']['rows_last'] = log.last_rows
             with open(self.__filename, 'w') as fd:
                 json.dump(self.__report, fd)
         atexit.register(finish)
