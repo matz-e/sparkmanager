@@ -31,6 +31,7 @@ class SparkReport(object):
                 'parallelism': manager.defaultParallelism,
                 'executors': manager._jsc.sc().getExecutorMemoryStatus().size(),
             },
+            'app': {},
             'slurm': {
                 'jobid': os.environ.get('SLURM_JOBID', ''),
                 'nodes': os.environ.get('SLURM_NODELIST', ''),
@@ -62,6 +63,13 @@ class SparkReport(object):
             with open(self.__filename, 'w') as fd:
                 json.dump(self.__report, fd)
         atexit.register(finish)
+
+    def add_info(self, data):
+        """Add additional information to the report
+
+        :param data: a dictionary to store under the key `app`
+        """
+        self.__report['app'].update(data)
 
     def __call__(self, name, start, end):
         """Update stored information
@@ -178,6 +186,14 @@ class SparkManager(object):
             self.__report = SparkReport(report, self)
 
         return self.__session
+
+    def record(self, data):
+        """Pass application data through to the report (if enabled)
+
+        :param data: a dictionary to save in the report JSON
+        """
+        if self.__report:
+            self.__report.add_info(data)
 
     def register_java_functions(self, fcts):
         """Register java functions with the SQL context of Spark
