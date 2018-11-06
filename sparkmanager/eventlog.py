@@ -84,14 +84,14 @@ class EventLog(object):
         """:property: the maximum shuffle size seen
         """
         self._load_data()
-        return max([max(s.shuffle_read, s.shuffle_write) for s in self._stages.values()])
+        return max([0] + [max(s.shuffle_read, s.shuffle_write) for s in self._stages.values()])
 
     @property
     def max_rows(self):
         """:property: the number of output records of the last stage having measured some
         """
         self._load_data()
-        return max([s.output_rows for s in self._stages.values()])
+        return max([0] + [s.output_rows for s in self._stages.values()])
 
     @property
     def last_rows(self):

@@ -55,7 +55,7 @@ class SparkReport(object):
             """
             now = time.time()
             self.__report['runtime'].append((now - self.__start, self.__start, now))
-            if self.__eventlog:
+            if os.path.exists(self.__eventlog):
                 log = EventLog(self.__eventlog)
                 self.__report['spark']['shuffle'] = log.shuffle_size
                 self.__report['spark']['rows_max'] = log.max_rows
