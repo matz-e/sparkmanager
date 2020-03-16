@@ -56,10 +56,16 @@ class SparkReport(object):
             now = time.time()
             self.__report['runtime'].append((now - self.__start, self.__start, now))
             if os.path.exists(self.__eventlog):
-                log = EventLog(self.__eventlog)
-                self.__report['spark']['shuffle'] = log.shuffle_size
-                self.__report['spark']['rows_max'] = log.max_rows
-                self.__report['spark']['rows_last'] = log.last_rows
+                try:
+                    log = EventLog(self.__eventlog)
+                    self.__report['spark']['shuffle'] = log.shuffle_size
+                    self.__report['spark']['rows_max'] = log.max_rows
+                    self.__report['spark']['rows_last'] = log.last_rows
+                except Exception as e:
+                    self.__report['spark']['processing_error'] = str(e)
+                    self.__report['spark']['shuffle'] = float('nan')
+                    self.__report['spark']['rows_max'] = float('nan')
+                    self.__report['spark']['rows_last'] = float('nan')
             with open(self.__filename, 'w') as fd:
                 json.dump(self.__report, fd)
         atexit.register(finish)
