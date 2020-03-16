@@ -40,7 +40,7 @@ The module itself acts as a mediator to Spark:
 The Spark session can be accessed via ``sm.spark``, the Spark context via
 ``sm.sc``. Both attributes are instantiated once the ``create`` method is
 called, with the option to call unambiguous methods from both directly via
-the :py:class:`SparkManager` object:
+the ``SparkManager`` object:
 
 .. code:: python
 
